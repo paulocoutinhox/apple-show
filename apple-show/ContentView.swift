@@ -1,17 +1,74 @@
 import SwiftUI
+import AVFoundation
+import MediaPlayer
 
-// MARK: - UIKit Play/Pause Catcher
+// MARK: - AVPlayer Remote Control Manager
+
+class AVPlayerRemoteManager: ObservableObject {
+    static let shared = AVPlayerRemoteManager()
+
+    var onForward: (() -> Void)?
+    var onRewind: (() -> Void)?
+
+    private var player: AVPlayer?
+
+    private init() {
+        // Use um áudio local válido chamado "blank.mp3" no projeto
+        if let url = Bundle.main.url(forResource: "blank", withExtension: "mp3") {
+            player = AVPlayer(url: url)
+        }
+        setupRemoteCommands()
+    }
+
+    private func setupRemoteCommands() {
+        let center = MPRemoteCommandCenter.shared()
+        center.skipForwardCommand.isEnabled = true
+        center.skipForwardCommand.preferredIntervals = [5]
+        center.skipForwardCommand.addTarget { [weak self] _ in
+            self?.onForward?()
+            return .success
+        }
+        center.skipBackwardCommand.isEnabled = true
+        center.skipBackwardCommand.preferredIntervals = [5]
+        center.skipBackwardCommand.addTarget { [weak self] _ in
+            self?.onRewind?()
+            return .success
+        }
+    }
+
+    func play() {
+        player?.play()
+    }
+
+    func pause() {
+        player?.pause()
+    }
+}
+
+// MARK: - UIKit Play/Pause + Next/Prev Catcher
 
 class PlayPauseCatcher: UIViewController {
     var onPlayPause: (() -> Void)?
+    var onNext: (() -> Void)?
+    var onPrev: (() -> Void)?
 
     override var canBecomeFirstResponder: Bool { true }
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if presses.contains(where: { $0.type == .playPause }) {
-            onPlayPause?()
-        } else {
-            super.pressesBegan(presses, with: event)
+        for press in presses {
+            switch press.type {
+            case .playPause:
+                onPlayPause?()
+            case .rightArrow:
+                onNext?()
+            case .leftArrow:
+                onPrev?()
+            case .select:
+                // Opcional: se quiser que clique no touchpad avance slide
+                onNext?()
+            default:
+                super.pressesBegan(presses, with: event)
+            }
         }
     }
 
@@ -23,15 +80,21 @@ class PlayPauseCatcher: UIViewController {
 
 struct PlayPauseRepresentable: UIViewControllerRepresentable {
     var onPlayPause: () -> Void
+    var onNext: () -> Void
+    var onPrev: () -> Void
 
     func makeUIViewController(context: Context) -> PlayPauseCatcher {
         let c = PlayPauseCatcher()
         c.onPlayPause = onPlayPause
+        c.onNext = onNext
+        c.onPrev = onPrev
         return c
     }
 
     func updateUIViewController(_ uiViewController: PlayPauseCatcher, context: Context) {
         uiViewController.onPlayPause = onPlayPause
+        uiViewController.onNext = onNext
+        uiViewController.onPrev = onPrev
     }
 }
 
@@ -77,7 +140,6 @@ class SlidesViewModel: ObservableObject {
             self.isLoading = false
             return
         }
-        // Baixa JSON
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
             guard let self else { return }
             if let error = error {
@@ -174,6 +236,14 @@ class SlidesViewModel: ObservableObject {
         startTimer()
     }
 
+    func prevSlide() {
+        guard !slides.isEmpty else { return }
+        withAnimation {
+            currentIndex = (currentIndex - 1 + slides.count) % slides.count
+        }
+        startTimer()
+    }
+
     deinit {
         timer?.invalidate()
     }
@@ -191,7 +261,6 @@ extension Array {
 
 struct ContentView: View {
     @StateObject private var vm = SlidesViewModel()
-    // Substitua pela sua URL pública do S3:
     private let jsonURL = "https://bibleapp-data.s3.us-east-1.amazonaws.com/config/banners-app-show.json"
 
     var body: some View {
@@ -250,14 +319,32 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
             }
-            // UIKit catch de Play/Pause
-            PlayPauseRepresentable {
-                vm.loadSlides(from: jsonURL)
-            }
+            // UIKit catch de Play/Pause + Next/Prev
+            PlayPauseRepresentable(
+                onPlayPause: {
+                    vm.loadSlides(from: jsonURL)
+                },
+                onNext: {
+                    vm.nextSlide()
+                },
+                onPrev: {
+                    vm.prevSlide()
+                }
+            )
             .frame(width: 0, height: 0)
         }
         .onAppear {
             vm.loadSlides(from: jsonURL)
+            AVPlayerRemoteManager.shared.onForward = {
+                vm.nextSlide()
+            }
+            AVPlayerRemoteManager.shared.onRewind = {
+                vm.prevSlide()
+            }
+            AVPlayerRemoteManager.shared.play()
+        }
+        .onDisappear {
+            AVPlayerRemoteManager.shared.pause()
         }
     }
 }
