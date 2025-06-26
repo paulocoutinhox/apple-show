@@ -1,49 +1,4 @@
-import AVFoundation
-import MediaPlayer
 import SwiftUI
-
-// MARK: - AVPlayer Remote Control Manager
-
-class AVPlayerRemoteManager: ObservableObject {
-    static let shared = AVPlayerRemoteManager()
-
-    var onForward: (() -> Void)?
-    var onRewind: (() -> Void)?
-
-    private var player: AVPlayer?
-
-    private init() {
-        // Use um áudio local válido chamado "blank.mp3" no projeto
-        if let url = Bundle.main.url(forResource: "blank", withExtension: "mp3") {
-            player = AVPlayer(url: url)
-        }
-        setupRemoteCommands()
-    }
-
-    private func setupRemoteCommands() {
-        let center = MPRemoteCommandCenter.shared()
-        center.skipForwardCommand.isEnabled = true
-        center.skipForwardCommand.preferredIntervals = [5]
-        center.skipForwardCommand.addTarget { [weak self] _ in
-            self?.onForward?()
-            return .success
-        }
-        center.skipBackwardCommand.isEnabled = true
-        center.skipBackwardCommand.preferredIntervals = [5]
-        center.skipBackwardCommand.addTarget { [weak self] _ in
-            self?.onRewind?()
-            return .success
-        }
-    }
-
-    func play() {
-        player?.play()
-    }
-
-    func pause() {
-        player?.pause()
-    }
-}
 
 // MARK: - UIKit Play/Pause + Next/Prev Catcher
 
@@ -145,7 +100,13 @@ class SlidesViewModel: ObservableObject {
             isLoading = false
             return
         }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+
+        // Criar request que ignora cache
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 30
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self else { return }
             if let error = error {
                 DispatchQueue.main.async {
@@ -356,18 +317,6 @@ struct ContentView: View {
 
             // Carrega os slides
             vm.loadSlides(from: jsonURL)
-
-            // Configura os comandos remotos
-            AVPlayerRemoteManager.shared.onForward = {
-                vm.nextSlide()
-            }
-            AVPlayerRemoteManager.shared.onRewind = {
-                vm.prevSlide()
-            }
-            AVPlayerRemoteManager.shared.play()
-        }
-        .onDisappear {
-            AVPlayerRemoteManager.shared.pause()
         }
     }
 }
