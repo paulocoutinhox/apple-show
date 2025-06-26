@@ -13,9 +13,6 @@ class AVPlayerRemoteManager: ObservableObject {
     private var player: AVPlayer?
 
     private init() {
-        // Evita sleep/screensaver
-        UIApplication.shared.isIdleTimerDisabled = true
-
         // Use um áudio local válido chamado "blank.mp3" no projeto
         if let url = Bundle.main.url(forResource: "blank", withExtension: "mp3") {
             player = AVPlayer(url: url)
@@ -125,6 +122,7 @@ struct LoadedSlide: Identifiable {
     let imageURL: String
     let interval: Double?
     let uiImage: UIImage
+    let order: Int
 }
 
 // MARK: - ViewModel
@@ -211,7 +209,8 @@ class SlidesViewModel: ObservableObject {
                     title: slide.title,
                     imageURL: slide.image,
                     interval: slide.interval,
-                    uiImage: uiImage
+                    uiImage: uiImage,
+                    order: slide.order
                 )
                 DispatchQueue.main.async {
                     loaded.append(loadedSlide)
@@ -227,7 +226,9 @@ class SlidesViewModel: ObservableObject {
                 self.errorMessage = "Nenhuma imagem foi carregada."
                 self.isLoading = false
             } else {
-                self.slides = loaded
+                // Ordenar os slides carregados pela ordem correta
+                let sortedLoaded = loaded.sorted { $0.order < $1.order }
+                self.slides = sortedLoaded
                 self.currentIndex = 0
                 self.isLoading = false
                 self.startTimer()
@@ -350,7 +351,13 @@ struct ContentView: View {
             .frame(width: 0, height: 0)
         }
         .onAppear {
+            // Evita sleep/screensaver
+            UIApplication.shared.isIdleTimerDisabled = true
+
+            // Carrega os slides
             vm.loadSlides(from: jsonURL)
+
+            // Configura os comandos remotos
             AVPlayerRemoteManager.shared.onForward = {
                 vm.nextSlide()
             }
