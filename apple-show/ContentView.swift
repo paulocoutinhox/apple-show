@@ -135,6 +135,7 @@ class SlidesViewModel: ObservableObject {
     @Published var currentIndex: Int = 0
     @Published var isLoading = true
     @Published var errorMessage: String? = nil
+    @Published var loadedCount: Int = 0
 
     private var timer: Timer?
 
@@ -185,6 +186,11 @@ class SlidesViewModel: ObservableObject {
         let group = DispatchGroup()
         var foundError: String?
 
+        // Reset do contador
+        DispatchQueue.main.async {
+            self.loadedCount = 0
+        }
+
         for slide in sortedSlides {
             guard let url = URL(string: slide.image) else {
                 foundError = "URL de imagem inválida: \(slide.image)"
@@ -209,6 +215,7 @@ class SlidesViewModel: ObservableObject {
                 )
                 DispatchQueue.main.async {
                     loaded.append(loadedSlide)
+                    self.loadedCount += 1
                 }
             }.resume()
         }
@@ -297,7 +304,7 @@ struct ContentView: View {
                         .progressViewStyle(.circular)
                         .scaleEffect(2)
                         .padding(.bottom, 24)
-                    Text("Carregando slides e imagens…")
+                    Text("Carregando slides e imagens… (\(vm.loadedCount) banners carregados)")
                         .foregroundColor(.white)
                         .font(.title3)
                 }
