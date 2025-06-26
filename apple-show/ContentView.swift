@@ -1,28 +1,28 @@
-import SwiftUI
 import AVFoundation
 import MediaPlayer
+import SwiftUI
 
 // MARK: - AVPlayer Remote Control Manager
 
 class AVPlayerRemoteManager: ObservableObject {
     static let shared = AVPlayerRemoteManager()
-    
+
     var onForward: (() -> Void)?
     var onRewind: (() -> Void)?
-    
+
     private var player: AVPlayer?
-    
+
     private init() {
         // Evita sleep/screensaver
         UIApplication.shared.isIdleTimerDisabled = true
-        
+
         // Use um áudio local válido chamado "blank.mp3" no projeto
         if let url = Bundle.main.url(forResource: "blank", withExtension: "mp3") {
             player = AVPlayer(url: url)
         }
         setupRemoteCommands()
     }
-    
+
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
         center.skipForwardCommand.isEnabled = true
@@ -38,11 +38,11 @@ class AVPlayerRemoteManager: ObservableObject {
             return .success
         }
     }
-    
+
     func play() {
         player?.play()
     }
-    
+
     func pause() {
         player?.pause()
     }
@@ -54,9 +54,9 @@ class PlayPauseCatcher: UIViewController {
     var onPlayPause: (() -> Void)?
     var onNext: (() -> Void)?
     var onPrev: (() -> Void)?
-    
+
     override var canBecomeFirstResponder: Bool { true }
-    
+
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         for press in presses {
             switch press.type {
@@ -74,7 +74,7 @@ class PlayPauseCatcher: UIViewController {
             }
         }
     }
-    
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         becomeFirstResponder()
@@ -85,16 +85,16 @@ struct PlayPauseRepresentable: UIViewControllerRepresentable {
     var onPlayPause: () -> Void
     var onNext: () -> Void
     var onPrev: () -> Void
-    
-    func makeUIViewController(context: Context) -> PlayPauseCatcher {
+
+    func makeUIViewController(context _: Context) -> PlayPauseCatcher {
         let c = PlayPauseCatcher()
         c.onPlayPause = onPlayPause
         c.onNext = onNext
         c.onPrev = onPrev
         return c
     }
-    
-    func updateUIViewController(_ uiViewController: PlayPauseCatcher, context: Context) {
+
+    func updateUIViewController(_ uiViewController: PlayPauseCatcher, context _: Context) {
         uiViewController.onPlayPause = onPlayPause
         uiViewController.onNext = onNext
         uiViewController.onPrev = onPrev
@@ -107,11 +107,14 @@ struct SlidesData: Decodable {
     struct Config: Decodable {
         let interval: Double
     }
+
     struct Slide: Decodable {
         let title: String?
         let image: String
         let interval: Double?
+        let order: Int
     }
+
     let config: Config
     let slides: [Slide]
 }
@@ -132,15 +135,15 @@ class SlidesViewModel: ObservableObject {
     @Published var currentIndex: Int = 0
     @Published var isLoading = true
     @Published var errorMessage: String? = nil
-    
+
     private var timer: Timer?
-    
+
     func loadSlides(from urlString: String) {
-        self.isLoading = true
-        self.errorMessage = nil
+        isLoading = true
+        errorMessage = nil
         guard let url = URL(string: urlString) else {
-            self.errorMessage = "URL inválida."
-            self.isLoading = false
+            errorMessage = "URL inválida."
+            isLoading = false
             return
         }
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
@@ -173,13 +176,16 @@ class SlidesViewModel: ObservableObject {
             }
         }.resume()
     }
-    
+
     private func downloadAllImages(for slides: [SlidesData.Slide]) {
+        // Ordenar slides pelo campo "order"
+        let sortedSlides = slides.sorted { $0.order < $1.order }
+
         var loaded: [LoadedSlide] = []
         let group = DispatchGroup()
         var foundError: String?
-        
-        for slide in slides {
+
+        for slide in sortedSlides {
             guard let url = URL(string: slide.image) else {
                 foundError = "URL de imagem inválida: \(slide.image)"
                 break
@@ -221,7 +227,7 @@ class SlidesViewModel: ObservableObject {
             }
         }
     }
-    
+
     func startTimer() {
         timer?.invalidate()
         guard !slides.isEmpty else { return }
@@ -230,7 +236,7 @@ class SlidesViewModel: ObservableObject {
             self?.nextSlide()
         }
     }
-    
+
     func nextSlide() {
         guard !slides.isEmpty else { return }
         withAnimation {
@@ -238,7 +244,7 @@ class SlidesViewModel: ObservableObject {
         }
         startTimer()
     }
-    
+
     func prevSlide() {
         guard !slides.isEmpty else { return }
         withAnimation {
@@ -246,7 +252,7 @@ class SlidesViewModel: ObservableObject {
         }
         startTimer()
     }
-    
+
     deinit {
         timer?.invalidate()
     }
@@ -265,7 +271,7 @@ extension Array {
 struct ContentView: View {
     @StateObject private var vm = SlidesViewModel()
     private let jsonURL = "https://bibleapp-data.s3.us-east-1.amazonaws.com/config/banners-app-show.json"
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             if let error = vm.errorMessage {
@@ -303,7 +309,7 @@ struct ContentView: View {
                         .transition(.opacity)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .ignoresSafeArea()
-                    
+
                     if let title = slide.title {
                         HStack {
                             Text(title)

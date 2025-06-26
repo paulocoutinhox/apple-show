@@ -26,15 +26,18 @@ The app loads slides from a JSON configuration file. Here's the required format:
     {
       "title": "Welcome to Our Store",
       "image": "https://example.com/banner1.jpg",
-      "interval": 8.0
+      "interval": 8.0,
+      "order": 1
     },
     {
       "title": "Special Offers",
       "image": "https://example.com/banner2.jpg",
-      "interval": 12.0
+      "interval": 12.0,
+      "order": 2
     },
     {
-      "image": "https://example.com/banner3.jpg"
+      "image": "https://example.com/banner3.jpg",
+      "order": 3
     }
   ]
 }
@@ -49,6 +52,7 @@ The app loads slides from a JSON configuration file. Here's the required format:
 - `title` (string, optional): Title to display over the image
 - `image` (string, required): URL of the image to display
 - `interval` (number, optional): Custom interval for this specific slide (overrides global interval)
+- `order` (number, required): Display order for the slide (slides are sorted by this field in ascending order)
 
 ## Usage
 
@@ -112,6 +116,18 @@ The app loads slides from a JSON configuration file. Here's the required format:
 2. Open `apple-show.xcodeproj` in Xcode
 3. Update the `jsonURL` in `ContentView.swift` with your configuration file
 4. Build and run on Apple TV simulator or device
+
+## Development
+
+### Code Formatting
+
+To format the Swift code in this project, run:
+
+```bash
+swiftformat apple-show/
+```
+
+Make sure you have [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) installed on your system.
 
 ## Customization
 

@@ -1,0 +1,7 @@
+# format options
+--allman false
+--indent 4
+--enable consecutiveBlankLines
+
+# file options
+--exclude Pods
